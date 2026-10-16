@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>GHAR V MOBILE — v12</title>
+<style>
+  :root{
+    --bg: #87CEEB;
+    --panel: rgba(0,0,0,0.24);
+    --white: #fff;
+    --accent: #0A8ED9;
+    --danger: #d74d4d;
+  }
+  html, body{
+    margin:0; height:100%; overflow:hidden;
+    background: var(--bg);
+    font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    user-select:none; -webkit-user-select:none;
+    touch-action:none;
+  }
+  canvas{ display:block; width:100%; height:100%; }
+  /* Overlay / Loading */
+  #overlay{ position:fixed; inset:0; z-index:99; display:flex; align-items:center; justify-content:center; background: rgba(6,10,20,0.55); }
+  #loading{ width:min(86vw,420px); background: rgba(0,0,0,0.68); color:#fff; border-radius:14px; padding:16px; text-align:center; }
+  #progress{ margin-top:12px; height:10px; border-radius:8px; background: rgba(255,255,255,0.12); overflow:hidden; }
+  #progressBar{ height:100%; width:0; background: linear-gradient(90deg,#44b3ff,#0b84ff); border-radius:8px; transition:width 200ms linear; }
+  #error{ margin-top:8px; color:#ffb3b3; font-size:13px; display:none; }
+
+  /* HUD */
+  #hud{ position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:48; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,0.6); pointer-events:none; display:flex; gap:10px; align-items:center; }
+  #title { font-weight:900; font-size:14px; background:rgba(0,0,0,0.2); padding:6px 10px; border-radius:10px; }
+  #version { font-weight:800; font-size:12px; color:#ffd86b; margin-left:6px; }
+  #speed { font-size:16px; font-weight:900; background:rgba(0,0,0,0.22); padding:7px 12px; border-radius:8px; display:flex; align-items:center; gap:8px; }
+  #gauge { width:56px; height:56px; background:rgba(0,0,0,0.16); border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; }
+
+  #speedNeedle { width:36px; height:6px; background:#fff3; position:relative; border-radius:3px; transform-origin:6px 3px; }
+
+  #checkpointMsg{ position:fixed; top:62px; left:50%; transform:translateX(-50%); z-index:48; background: rgba(0,0,0,0.28); color:#fff; padding:8px 14px; border-radius:10px; font-size:14px; display:none; }
+
+  /* Controls */
+  #pauseBtn{ position:fixed; top:12px; left:12px; z-index:50; width:44px; height:44px; border:none; border-radius:10px; background: rgba(0,0,0,0.24); color:#fff; font-size:18px; font-weight:800; }
+  #instructions{ position:fixed; top:12px; right:12px; z-index:50; font-size:12px; color:#fff; background: rgba(0,0,0,0.2); border-radius:8px; padding:7px 10px; max-width:160px; text-align:right; }
+
+  #pauseMenu{ position:fixed; inset:0; z-index:90; display:none; align-items:center; justify-content:center; flex-direction:column; gap:12px; background: rgba(0,0,0,0.6); }
+  .menuBtn{ background:#1a1d22; color:#fff; border:none; padding:12px 22px; border-radius:12px; font-size:16px; font-weight:700; min-width:160px; }
+
+  #joystick{ position:fixed; left:12px; bottom:18%; width:130px; height:130px; border-radius:50%; background: rgba(0,0,0,0.15); z-index:40; pointer-events:auto; }
+  #stick{ position:absolute; width:52px; height:52px; border-radius:50%; left:50%; top:50%; transform:translate(-50%,-50%); background: rgba(255,255,255,0.92); box-shadow:0 8px 20px rgba(0,0,0,0.25); }
+
+  .buttons{ position:fixed; right:12px; bottom:14%; z-index:40; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .btn{ width:78px; height:50px; border:none; border-radius:12px; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.24); color:#fff; font-size:13px; font-weight:800; box-shadow: 0 10px 18px rgba(0,0,0,0.18); }
+  .btn.small{ width:62px; height:50px; border-radius:14px; font-size:12px; }
+  .btn.active{ background: rgba(255,150,0,0.9); }
+  #enterBtn{ background: rgba(20,130,210,0.9); }
+
+  /* small screens tweak */
+  @media (max-width:420px){
+    #joystick{ width:115px; height:115px; bottom:17%; left:10px; }
+    #stick{ width:46px; height:46px; }
+    .btn{ width:64px; height:46px; }
+    .btn.small{ width:54px; height:46px; }
+    #instructions{ font-size:11px; max-width:120px; }
+  }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="loading">
+    <div style="font-size:18px;font-weight:800">GHAR V MOBILE — v12</div>
+    <div style="margin-top:6px;font-size:13px;opacity:0.95">Upgraded engine, better car physics, in-browser V12 synth</div>
+    <div id="progress"><div id="progressBar"></div></div>
+    <div id="error"></div>
+  </div>
+</div>
+
+<button id="pauseBtn">II</button>
+<div id="instructions">Drive to all checkpoints • Tap screen once to enable audio</div>
+<div id="hud">
+  <div id="title">GHAR V MOBILE</div><div id="version">v12</div>
+  <div id="speed" style="display:none"><div id="gauge"><div id="speedNeedle" style="transform:rotate(-90deg)"></div></div><div id="speedText">0 km/h</div></div>
+</div>
+
+<div id="checkpointMsg">Checkpoint</div>
+
+<div id="pauseMenu">
+  <button id="resumeBtn" class="menuBtn">Resume</button>
+  <button id="restartBtn" class="menuBtn">Restart</button>
+</div>
+
+<div id="joystick" aria-label="Joypad"><div id="stick"></div></div>
+
+<div class="buttons">
+  <div id="jumpBtn" class="btn small">Jump</div>
+  <div id="runBtn" class="btn small">Accel</div>
+  <div id="brakeBtn" class="btn small">Brake</div>
+  <div id="reverseBtn" class="btn small">Rev</div>
+  <div id="enterBtn" class="btn">Enter</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script>
+/*
+  GHAR V MOBILE — v12 (single-file)
+  - Improvements over v3: simulated V12 engine sound (WebAudio), gear-based car physics, stronger acceleration, rev/idle behavior,
+    HUD gauge needle, v12 version label, mobile-friendly audio start on gesture.
+  - All in one index.html, no external assets required.
+*/
+
+(() => {
+  "use strict";
+
+  /* UI refs */
+  const overlay = document.getElementById('overlay');
+  const progressBar = document.getElementById('progressBar');
+  const errorBox = document.getElementById('error');
+  const speedText = document.getElementById('speedText');
+  const speedNeedle = document.getElementById('speedNeedle');
+  const speedContainer = document.getElementById('speed');
+  const checkpointMsg = document.getElementById('checkpointMsg');
+
+  function setProgress(p){ progressBar.style.width = Math.min(100,Math.max(0, p)) + '%'; }
+  function showError(msg){ errorBox.style.display='block'; errorBox.textContent = msg; }
+
+  /* Three.js scene */
+  let scene, camera, renderer, sunLight, hemiLight;
+  const worldColliders = [];
+  const checkpointData = [];
+  let lastTime = 0;
+  let loading = true;
+  let audioStarted = false;
+
+  /* Input & state */
+  const state = {
+    joystick: { x:0,y:0,active:false },
+    inputs: { accel:false, brake:false, reverse:false, jump:false },
+    paused: false,
+    missionIndex: 0,
+    missionComplete: false
+  };
+
+  /* Player (third person) */
+  const player = {
+    group: null, yaw: Math.PI, radius:1.05, onGround:true, vy:0, move:8, run:16
+  };
+
+  /* Car (V12 upgrade) */
+  const car = {
+    mesh:null, heading:Math.PI, position:new THREE.Vector3(0,0.2,14),
+    speed:0, maxSpeed:36, radius:2.1, occupied:false,
+    gears:[2.6,1.78,1.2,0.85,0.56,0.35], // simplified gear ratios
+    gearIndex:0, rpm:900, idleRpm:900, redline:7200, torqueCurve: null
+  };
+
+  /* WebAudio V12 synth */
+  let audioCtx = null;
+  let masterGain = null;
+  let engineNode = null;
+
+  function initAudio() {
+    if (audioStarted) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.warn('AudioContext not available:', e);
+      return;
+    }
+    masterGain = audioCtx.createGain(); masterGain.gain.value = 0.0; masterGain.connect(audioCtx.destination);
+
+    // Create a lightweight "V12" by layering several detuned oscillators + filtered noise
+    const carriers = [];
+    const carrierGain = audioCtx.createGain(); carrierGain.gain.value = 0.6;
+    const carrierFilter = audioCtx.createBiquadFilter(); carrierFilter.type = 'lowpass'; carrierFilter.frequency.value = 6000;
+    carrierGain.connect(carrierFilter);
+    carrierFilter.connect(masterGain);
+
+    // 6 oscillators (each doubled in phase) to emulate V12 richness
+    for (let i=0;i<6;i++){
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sawtooth';
+      const g = audioCtx.createGain(); g.gain.value = 0.08;
+      osc.connect(g);
+      g.connect(carrierGain);
+      osc.start();
+      carriers.push({osc, g});
+    }
+
+    // small filtered noise for rumble
+    const noiseBuf = audioCtx.createBuffer(1, 4096, audioCtx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for (let i=0;i<data.length;i++) data[i] = (Math.random()*2 - 1) * 0.6;
+    const noise = audioCtx.createBufferSource(); noise.buffer = noiseBuf; noise.loop = true;
+    const noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type='bandpass'; noiseFilter.frequency.value = 120; noiseFilter.Q.value = 0.7;
+    const noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.025;
+    noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(masterGain);
+    noise.start();
+
+    // Expose engineNode
+    engineNode = {
+      carriers,
+      carrierGain,
+      carrierFilter,
+      noiseGain,
+      setRPM(rpm){
+        // rpm approx 800-7200
+        const clamped = Math.max(800, Math.min(car.redline, rpm));
+        // map rpm to base frequency for each oscillator (V12 tone ~ low frequency pulsation + harmonics)
+        const fBase = 40 + (clamped / car.redline) * 420; // 40..460 Hz base-ish
+        // tune oscillators slightly detuned
+        carriers.forEach((c, idx) => {
+          const det = (idx - (carriers.length/2)) * 0.9 + (Math.sin(Date.now()*0.0006 + idx) * 0.2);
+          c.osc.frequency.value = Math.max(20, fBase * (1 + det*0.008));
+          c.g.gain.value = 0.04 + (Math.sin(idx + clamped*0.0008)+1)*0.02;
+        });
+        // carrier filter cutoff linked to rpm
+        const cutoff = 1200 + (clamped / car.redline) * 6000;
+        carrierFilter.frequency.value = Math.min(10000, cutoff);
+        // engine rumble (noise)
+        noiseGain.gain.value = 0.01 + (clamped / car.redline) * 0.07;
+        // master gain proportional (but constrained)
+        masterGain.gain.setTargetAtTime(0.12 + (clamped / car.redline) * 0.38, audioCtx.currentTime, 0.06);
+      },
+      setVolume(v){
+        masterGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.06);
+      }
+    };
+
+    audioStarted = true;
+    // set initial rpm
+    engineNode.setRPM(car.idleRpm);
+  }
+
+  /* THREE init */
+  function initThree(){
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x8ec9ff, 0.008);
+
+    camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 800);
+    camera.position.set(0,6,10);
+
+    renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.5));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    document.body.appendChild(renderer.domElement);
+
+    hemiLight = new THREE.HemisphereLight(0xffffff, 0x66718a, 0.8);
+    scene.add(hemiLight);
+
+    sunLight = new THREE.DirectionalLight(0xffffff, 1.05);
+    sunLight.position.set(30,50,10);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 1024; sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.camera.left = -80; sunLight.shadow.camera.right = 80; sunLight.shadow.camera.top = 80; sunLight.shadow.camera.bottom = -80;
+    scene.add(sunLight);
+
+    window.addEventListener('resize', onResize);
+  }
+
+  function makeMaterial(color, rough=0.9, metal=0.08){
+    return new THREE.MeshStandardMaterial({ color, roughness:rough, metalness:metal });
+  }
+
+  function addBox(x,y,z,w,h,d,color){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), makeMaterial(color)); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; scene.add(m); return m; }
+
+  /* Player */
+  function createPlayer(){
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.85,1.1,4,8), makeMaterial(0x4ab0ff,0.8,0.12));
+    body.position.y = 1.4; body.castShadow=true; g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.45,12,12), makeMaterial(0xf1c7a1));
+    head.position.y = 2.65; head.castShadow=true; g.add(head);
+    g.position.set(0,0.25,25);
+    scene.add(g);
+    player.group = g;
+  }
+
+  /* Car */
+  function createCar(){
+    const cg = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(5.4,1.2,2.4), makeMaterial(0x214db8,0.6,0.18));
+    body.position.y=1.2; body.castShadow=true; cg.add(body);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.9,1.8), makeMaterial(0x9fe7ff,0.75,0.06));
+    cabin.position.set(0.15,2.05,0); cabin.castShadow=true; cg.add(cabin);
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.45,1.6), makeMaterial(0xffd45e,0.6,0.06));
+    hood.position.set(1.7,1.6,0); hood.castShadow=true; cg.add(hood);
+
+    const wheelGeo = new THREE.CylinderGeometry(0.5,0.5,0.56,12);
+    const wheelMat = makeMaterial(0x0d0d0d,0.95,0.2);
+    const wheelPos = [[-1.9,0.55,1.2],[1.9,0.55,1.2],[-1.9,0.55,-1.2],[1.9,0.55,-1.2]];
+    wheelPos.forEach(p => { const w=new THREE.Mesh(wheelGeo,wheelMat); w.rotation.z=Math.PI/2; w.position.set(...p); w.castShadow=true; cg.add(w); });
+
+    cg.position.copy(car.position);
+    cg.rotation.y = car.heading;
+    scene.add(cg);
+    car.mesh = cg;
+  }
+
+  /* Simple city + mansion */
+  function buildWorld(){
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(600,600), makeMaterial(0x6fbf69));
+    ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+    const roadMat = makeMaterial(0x2f2f2f,0.95,0.06);
+    for (let i=-2;i<=2;i++){
+      const road = new THREE.Mesh(new THREE.BoxGeometry(18,0.08,600), roadMat);
+      road.position.set(i*40,0.02,0); road.receiveShadow = true; scene.add(road);
+      const s1 = new THREE.Mesh(new THREE.BoxGeometry(9,0.04,600), makeMaterial(0x9aa0a5)); s1.position.set(i*40+14,0.04,0); scene.add(s1);
+      const s2 = s1.clone(); s2.position.x = i*40-14; scene.add(s2);
+    }
+    for (let z=-200;z<=200;z+=45){
+      for (let x=-200;x<=200;x+=45){
+        if (Math.abs(x) < 40 && Math.abs(z) < 30) continue;
+        if (Math.random() > 0.6) continue;
+        const w = 10 + Math.random()*18; const d = 10 + Math.random()*18; const h = 5 + Math.random()*18;
+        const b = addBox(x + (Math.random()-0.5)*6, h/2, z + (Math.random()-0.5)*6, w, h, d, 0xded7cc);
+        worldColliders.push({ x: b.position.x, z: b.position.z, w: w+2, d: d+2, yMin:0, yMax: h+10 });
+      }
+    }
+
+    // trees & streetlights
+    for (let i=-140;i<=140;i+=30){
+      const t = makeTree(); t.position.set(i,0, -150); scene.add(t);
+      const t2 = makeTree(); t2.position.set(i,0, 150); scene.add(t2);
+    }
+
+    // mansion
+    createMansion();
+  }
+
+  function makeTree(){
+    const g = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.34,2.2,8), makeMaterial(0x7a4f30));
+    trunk.position.y = 1.1; trunk.castShadow = true; g.add(trunk);
+    const leaves = new THREE.Mesh(new THREE.SphereGeometry(1.15,10,10), makeMaterial(0x2f9d66));
+    leaves.position.y = 2.7; g.add(leaves);
+    return g;
+  }
+
+  function createMansion(){
+    const mansion = new THREE.Group();
+    mansion.position.set(0,0,70);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(32,0.4,38), makeMaterial(0xddd6c7));
+    floor.position.y = 0.2; mansion.add(floor);
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(32,7.2,1), makeMaterial(0xf2f0eb));
+    walls.position.set(0,3.6,19.5); mansion.add(walls);
+    // more walls & garage, windows...
+    const left = new THREE.Mesh(new THREE.BoxGeometry(1,7.2,36), makeMaterial(0xf2f0eb));
+    left.position.set(-15.3,3.6,0); mansion.add(left);
+    const right = left.clone(); right.position.x = 15.3; mansion.add(right);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(30,7.2,1), makeMaterial(0xf2f0eb)); back.position.set(0,3.6,-18.5); mansion.add(back);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(5.4,5.8,0.8), makeMaterial(0x7a4f30)); door.position.set(0,2.9,18.93); mansion.add(door);
+    scene.add(mansion);
+
+    // add simple colliders for mansion
+    worldColliders.push({ x:0, z:70, w:32, d:38, yMin:0, yMax:8 });
+  }
+
+  /* Checkpoints */
+  function addCheckpoint(x,z,label){
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.7,0.4,12), makeMaterial(0x5cd67a)); base.position.y = 0.22; g.add(base);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(1.1,2.6,12), makeMaterial(0xffd35a)); cone.position.y = 1.9; g.add(cone);
+    g.position.set(x,0,z); scene.add(g);
+    checkpointData.push({x,z,label,mesh:g,reached:false});
+  }
+  function createCheckpoints(){
+    addCheckpoint(-100,-80,'A');
+    addCheckpoint(100,-20,'B');
+    addCheckpoint(0,130,'C');
+  }
+
+  /* UI buttons & joystick handling */
+  function setupUI(){
+    const jumpBtn = document.getElementById('jumpBtn');
+    const runBtn = document.getElementById('runBtn');
+    const brakeBtn = document.getElementById('brakeBtn');
+    const reverseBtn = document.getElementById('reverseBtn');
+    const enterBtn = document.getElementById('enterBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const restartBtn = document.getElementById('restartBtn');
+
+    function bindToggle(el, key, cls='active'){
+      const down=(e)=>{ e.preventDefault(); state.inputs[key]=true; el.classList.add(cls); if(!audioStarted) tryStartAudio(); };
+      const up=(e)=>{ e.preventDefault(); state.inputs[key]=false; el.classList.remove(cls); };
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+      el.addEventListener('pointerleave', up);
+    }
+    bindToggle(jumpBtn,'jump'); bindToggle(runBtn,'accel'); bindToggle(brakeBtn,'brake'); bindToggle(reverseBtn,'reverse');
+
+    enterBtn.addEventListener('pointerdown',(e)=>{ e.preventDefault(); toggleCar(); if(!audioStarted) tryStartAudio(); });
+
+    pauseBtn.addEventListener('click', ()=>{ state.paused = !state.paused; document.getElementById('pauseMenu').style.display = state.paused ? 'flex':'none'; });
+    resumeBtn.addEventListener('click', ()=>{ state.paused = false; document.getElementById('pauseMenu').style.display = 'none'; });
+    restartBtn.addEventListener('click', ()=>{ resetGame(); document.getElementById('pauseMenu').style.display='none'; state.paused=false; });
+
+    // joystick
+    const pad = document.getElementById('joystick'), stick = document.getElementById('stick');
+    function moveStick(cx,cy){
+      const rect = pad.getBoundingClientRect();
+      const centerX = rect.left + rect.width*0.5, centerY = rect.top + rect.height*0.5;
+      const dx = cx - centerX, dy = cy - centerY;
+      const limit = rect.width * 0.34;
+      const dist = Math.min(Math.hypot(dx,dy), limit);
+      const ang = Math.atan2(dy,dx);
+      const x = Math.cos(ang)*dist, y = Math.sin(ang)*dist;
+      state.joystick.x = x / limit; state.joystick.y = y / limit;
+      stick.style.transform = `translate(${x}px, ${y}px)`;
+      state.joystick.active = true;
+      if(!audioStarted) tryStartAudio();
+    }
+    function resetStick(){ state.joystick.x=0; state.joystick.y=0; state.joystick.active=false; stick.style.transform='translate(-50%,-50%)'; }
+    pad.addEventListener('pointerdown', (e)=>{ e.preventDefault(); pad.setPointerCapture(e.pointerId); moveStick(e.clientX,e.clientY); });
+    pad.addEventListener('pointermove', (e)=>{ if(!state.joystick.active) return; moveStick(e.clientX,e.clientY); });
+    pad.addEventListener('pointerup', resetStick); pad.addEventListener('pointercancel', resetStick); pad.addEventListener('pointerleave', resetStick);
+
+    // first-touch starts audio context on mobile
+    document.body.addEventListener('pointerdown', tryStartAudio, { once:true });
+  }
+
+  /* Audio start on user gesture */
+  function tryStartAudio(){
+    if (audioStarted) return;
+    initAudio();
+    if (audioStarted) {
+      // small fade in of master gain
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+      engineNode.setRPM(car.idleRpm);
+      engineNode.setVolume(0.12);
+    }
+  }
+
+  /* Car / engine logic */
+  function rpmForSpeed(speed, gearIndex){
+    // speed in m/s-ish, convert to RPM using gear ratio and a constant
+    // We simulate: rpm = base * gearRatio * (speed)
+    const wheelCirc = 2.0; // approximate circumference factor
+    const gear = car.gears[gearIndex] || car.gears[car.gears.length-1];
+    const rpm = 800 + Math.abs(speed) * 120 * gear;
+    return Math.min(car.redline, Math.max(800, rpm));
+  }
+
+  function shiftGears(){
+    // simple auto-shift logic based on rpm
+    if (car.rpm > 6200 && car.gearIndex < car.gears.length-1) car.gearIndex++;
+    if (car.rpm < 2100 && car.gearIndex > 0) car.gearIndex--;
+  }
+
+  function toggleCar(){
+    if (car.occupied){
+      // exit
+      car.occupied = false;
+      car.mesh.visible = true;
+      player.group.visible = true;
+      document.getElementById('enterBtn').textContent = 'Enter';
+      engineNode && engineNode.setVolume(0.08);
+    } else {
+      // try entering if near
+      const dx = car.mesh.position.x - player.group.position.x, dz = car.mesh.position.z - player.group.position.z;
+      if (Math.hypot(dx,dz) < 4.8){
+        car.occupied = true;
+        player.group.visible = false;
+        document.getElementById('enterBtn').textContent = 'Exit';
+        engineNode && engineNode.setVolume(0.6);
+      } else {
+        checkpointMsg.textContent = 'Move closer to the car'; checkpointMsg.style.display='block';
+        setTimeout(()=> checkpointMsg.style.display='none', 1000);
+      }
+    }
+  }
+
+  /* Movement helpers and collision */
+  function checkCollision(pos, radius){
+    for (let i=0;i<worldColliders.length;i++){
+      const c = worldColliders[i];
+      const hw = c.w*0.5 + radius, hd = c.d*0.5 + radius;
+      if (Math.abs(pos.x - c.x) < hw && Math.abs(pos.z - c.z) < hd) return true;
+    }
+    return false;
+  }
+
+  function moveCircle(pos, radius, dx, dz){
+    const attemptedX = pos.clone(); attemptedX.x += dx;
+    let canX = true;
+    for (const c of worldColliders){ if (Math.abs(attemptedX.x - c.x) < (c.w/2 + radius) && Math.abs(attemptedX.z - c.z) < (c.d/2 + radius)){ canX = false; break; } }
+    if (canX) pos.x = attemptedX.x;
+
+    const attemptedZ = pos.clone(); attemptedZ.z += dz;
+    let canZ = true;
+    for (const c of worldColliders){ if (Math.abs(attemptedZ.x - c.x) < (c.w/2 + radius) && Math.abs(attemptedZ.z - c.z) < (c.d/2 + radius)){ canZ = false; break; } }
+    if (canZ) pos.z = attemptedZ.z;
+  }
+
+  /* Player update */
+  function updatePlayer(dt){
+    if (!player.group) return;
+    // rotation from joystick x
+    if (state.joystick.active){
+      player.yaw += state.joystick.x * 1.6 * dt;
+      const forward = new THREE.Vector3(Math.sin(player.yaw),0,Math.cos(player.yaw));
+      const right = new THREE.Vector3(forward.z,0,-forward.x);
+      const moveVec = new THREE.Vector3();
+      moveVec.addScaledVector(forward, -state.joystick.y);
+      moveVec.addScaledVector(right, state.joystick.x);
+      if (moveVec.lengthSq() > 1e-4){
+        moveVec.normalize();
+        const sp = state.inputs.accel ? player.run : player.move;
+        const amt = sp * dt;
+        moveCircle(player.group.position, player.radius, moveVec.x*amt, moveVec.z*amt);
+      }
+    }
+    // jump
+    if (state.inputs.jump && player.onGround){ player.vy = 6.8; player.onGround=false; }
+    player.vy -= 18*dt;
+    player.group.position.y += player.vy * dt;
+    if (player.group.position.y <= 0.25){ player.group.position.y = 0.25; player.vy=0; player.onGround=true; }
+    player.group.rotation.y = player.yaw;
+    // bounds
+    player.group.position.x = Math.max(-260, Math.min(260, player.group.position.x));
+    player.group.position.z = Math.max(-260, Math.min(260, player.group.position.z));
+  }
+
+  /* Car update (V12 physics) */
+  function updateCar(dt){
+    if (!car.mesh) return;
+    if (car.occupied){
+      // throttle & brake map to force
+      const throttle = state.inputs.accel ? 1 : 0;
+      const braking = state.inputs.brake ? 1 : 0;
+      const reversing = state.inputs.reverse ? 1:0;
+
+      // compute target acceleration using a torque-like function
+      const gear = car.gears[car.gearIndex] || car.gears[0];
+      const traction = 28; // effective force constant
+      const desiredAccel = (throttle - reversing*0.7) * (traction / (1 + Math.abs(car.speed)*0.08));
+      // braking stronger
+      let accel = desiredAccel;
+      if (braking) accel -= Math.sign(car.speed) * 24;
+
+      // integrate
+      car.speed += accel * dt;
+      // aerodynamic drag and rolling
+      car.speed *= (1 - Math.min(0.06, 0.01 + Math.abs(car.speed)*0.0035*dt));
+      car.speed = Math.max(-18, Math.min(car.maxSpeed, car.speed));
+
+      // steering
+      const steer = state.joystick.x || 0;
+      car.heading += steer * (1.6 + Math.abs(car.speed)/16) * dt * (car.speed !== 0 ? Math.sign(car.speed) : 1);
+
+      // movement & collision
+      const forward = new THREE.Vector3(Math.sin(car.heading), 0, Math.cos(car.heading));
+      const nextPos = car.mesh.position.clone().addScaledVector(forward, car.speed * dt);
+      if (!checkCollision(nextPos, car.radius + 0.6)) {
+        car.mesh.position.copy(nextPos);
+      } else {
+        car.speed *= -0.12;
+      }
+
+      // rpm calculation & shifting
+      car.rpm = rpmForSpeed(Math.abs(car.speed), car.gearIndex);
+      shiftGears();
+      if (engineNode) engineNode.setRPM(car.rpm);
+
+      // camera mode switch handled in camera update
+    } else {
+      // parked: small engine idle rpm if audio on
+      if (engineNode) engineNode.setRPM(car.idleRpm);
+    }
+
+    car.mesh.rotation.y = car.heading;
+    car.mesh.position.y = 0.18;
+  }
+
+  /* Collision for car & general collision check */
+  function checkPointCollision(pos){
+    // not used currently
+    return checkCollision(pos, 0.8);
+  }
+
+  /* Checkpoints update */
+  function updateCheckpoints(){
+    if (!checkpointData.length) return;
+    const cp = checkpointData[state.missionIndex];
+    if (!cp) return;
+    const dx = car.mesh.position.x - cp.x, dz = car.mesh.position.z - cp.z;
+    if ((dx*dx + dz*dz) < 28*28 && car.occupied){
+      cp.reached = true; cp.mesh.visible=false;
+      state.missionIndex++;
+      if (state.missionIndex < checkpointData.length){
+        checkpointMsg.textContent = 'Checkpoint ' + checkpointData[state.missionIndex].label; checkpointMsg.style.display='block';
+        setTimeout(()=> checkpointMsg.style.display='none', 1200);
+      } else {
+        state.missionComplete = true;
+        checkpointMsg.textContent = 'Mission complete!'; checkpointMsg.style.display='block';
+        setTimeout(()=> checkpointMsg.style.display='none', 2000);
+      }
+    }
+  }
+
+  /* Camera follow: player or car */
+  function updateCamera(dt){
+    if (!camera) return;
+    if (car.occupied){
+      const target = car.mesh.position.clone();
+      const forward = new THREE.Vector3(Math.sin(car.heading),0,Math.cos(car.heading));
+      const camPos = target.clone().add(forward.clone().multiplyScalar(-9)).add(new THREE.Vector3(0,4.0,0));
+      camera.position.lerp(camPos, 0.12);
+      const look = target.clone().add(new THREE.Vector3(0,1.2,0));
+      camera.lookAt(look);
+    } else {
+      const target = player.group.position.clone().add(new THREE.Vector3(0,1.4,0));
+      const dir = new THREE.Vector3(Math.sin(player.yaw),0,Math.cos(player.yaw));
+      const camPos = target.clone().add(dir.clone().multiplyScalar(-7.0)).add(new THREE.Vector3(0,3.4,0));
+      camera.position.lerp(camPos, 0.12);
+      const look = target.clone().add(dir.clone().multiplyScalar(5)).add(new THREE.Vector3(0,1.2,0));
+      camera.lookAt(look);
+    }
+  }
+
+  function updateHUD(){
+    if (car.occupied){
+      speedContainer.style.display = 'flex';
+      const kph = Math.round(Math.abs(car.speed) * 12);
+      speedText.textContent = kph + ' km/h';
+      // needle rotate -90..90 deg mapped from 0..maxSpeed
+      const t = Math.min(1, Math.abs(car.speed) / car.maxSpeed);
+      const angle = -88 + t * 176; // -88..+88
+      speedNeedle.style.transform = `rotate(${angle}deg)`;
+    } else {
+      speedContainer.style.display = 'none';
+    }
+  }
+
+  /* Rendering loop */
+  function animate(t){
+    requestAnimationFrame(animate);
+    if (!lastTime) lastTime = t;
+    const dt = Math.min(0.032, (t - lastTime)/1000);
+    lastTime = t;
+    if (loading){
+      setProgress(100);
+      setTimeout(()=> { overlay.style.display = 'none'; loading = false; }, 350);
+    }
+
+    if (!state.paused && !loading){
+      updatePlayer(dt);
+      updateCar(dt);
+      updateCheckpoints();
+      updateCamera(dt);
+      updateHUD();
+    }
+    renderer.render(scene, camera);
+  }
+
+  /* Setup all */
+  function setup(){
+    initThree();
+    createPlayer();
+    createCar();
+    buildWorld();
+    createCheckpoints();
+    setupUI();
+    setProgress(55);
+    // finalize
+    setProgress(88);
+    requestAnimationFrame(animate);
+  }
+
+  /* Utility: createPlayer & car wrappers already defined above */
+  function createPlayer(){
+    // function exists earlier; nothing extra
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.85,1.05,4,8), makeMaterial(0x4ab0ff,0.8,0.12));
+    body.position.y = 1.4; body.castShadow=true; g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.45,12,12), makeMaterial(0xf1c7a1));
+    head.position.y = 2.65; head.castShadow=true; g.add(head);
+    g.position.set(0,0.25,25);
+    scene.add(g);
+    player.group = g;
+  }
+
+  function createCar(){
+    // already defined above, ensure we call same
+    const cg = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(5.4,1.2,2.4), makeMaterial(0x214db8,0.6,0.18));
+    body.position.y=1.2; body.castShadow=true; cg.add(body);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.9,1.8), makeMaterial(0x9fe7ff,0.75,0.06));
+    cabin.position.set(0.15,2.05,0); cabin.castShadow=true; cg.add(cabin);
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.45,1.6), makeMaterial(0xffd45e,0.6,0.06));
+    hood.position.set(1.7,1.6,0); hood.castShadow=true; cg.add(hood);
+    const wheelGeo = new THREE.CylinderGeometry(0.5,0.5,0.56,12);
+    const wheelMat = makeMaterial(0x0d0d0d,0.95,0.2);
+    const wheelPos = [[-1.9,0.55,1.2],[1.9,0.55,1.2],[-1.9,0.55,-1.2],[1.9,0.55,-1.2]];
+    wheelPos.forEach(p => { const w=new THREE.Mesh(wheelGeo,wheelMat); w.rotation.z=Math.PI/2; w.position.set(...p); w.castShadow=true; cg.add(w); });
+    cg.position.copy(car.position); cg.rotation.y = car.heading;
+    scene.add(cg);
+    car.mesh = cg;
+  }
+
+  /* Reset/start state */
+  function resetGame(){
+    // player pos
+    player.group.position.set(0,0.25,25); player.group.rotation.y = Math.PI; player.yaw = Math.PI; player.vy=0; player.onGround=true;
+    // car
+    car.mesh.position.set(0,0.18,14); car.mesh.rotation.y = Math.PI; car.heading = Math.PI; car.speed=0; car.occupied=false; car.gearIndex = 0;
+    // checkpoints
+    checkpointData.forEach(cp => { cp.reached=false; cp.mesh.visible=true; });
+    state.missionIndex = 0; state.missionComplete=false;
+    document.getElementById('enterBtn').textContent = 'Enter';
+    if (engineNode) engineNode.setRPM(car.idleRpm);
+  }
+
+  /* Kickoff */
+  setProgress(7);
+  try {
+    setup();
+    setProgress(100);
+    // small delay to hide overlay later in animate
+  } catch (e){
+    console.error(e);
+    showError('Failed to initialize game — try Chrome or Firefox on Android.');
+  }
+
+})();
+</script>
+</body>
+</html>
